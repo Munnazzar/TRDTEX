@@ -53,7 +53,7 @@
 % --- Headers ---
 \pagestyle{fancy}
 \fancyhf{}
-\lhead{\textbf{Team Name} -- ICPC Reference}
+\lhead{\textbf{Paranoid Android} -- ICPC Reference}
 \rhead{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
@@ -62,6 +62,44 @@
 \titlespacing*{\subsection}{0pt}{5pt}{2pt}
 
 \begin{document}
+
+% ==========================================
+%  TITLE PAGE (FRONT PAGE)
+% ==========================================
+\begin{titlepage}
+    \pagestyle{empty} % Removes header/footer from cover page
+    \centering
+    \vspace*{3cm}     % Vertical padding from top
+
+    % University / Organization Name
+    {\Huge \textbf{NU-FAST KARACHI}} \\[0.5cm]
+    {\Large \textit{Department of Computer Science}}
+
+    \vspace{3.5cm}
+
+    % Team Name with horizontal rules for emphasis
+    \rule{\linewidth}{1mm} \\[0.4cm]
+    {\fontsize{50}{60}\selectfont \textbf{Paranoid Android}} \\[0.2cm]
+    \rule{\linewidth}{1mm}
+
+    \vspace{1.5cm}
+
+    % Document Type & Date
+    {\LARGE \textbf{ICPC Team Reference Document}} \\[0.5cm]
+    {\Large \today}
+
+    \vfill
+
+    % Team Members
+    \begin{center} \Large
+        \textbf{Members:} \\ [0.5em]
+        Munnazzar Shahzad \hspace{2cm} $\cdot$ \hspace{2cm} Asfandyar Khanzada \hspace{2cm} $\cdot$ \hspace{2cm} Asim Ali
+    \end{center}
+
+    \vspace*{2cm} % Bottom padding
+\end{titlepage}
+\newpage
+% ==========================================
 
 % 2 Columns
 \begin{multicols*}{2}
@@ -76,6 +114,26 @@
 % ==========================================
 
 \section{Data Structures}
+\subsection{RMQ}
+\begin{lstlisting}
+#pragma once
+template<class T>
+struct RMQ {
+	vector<vector<T>> jmp;
+	RMQ(const vector<T>& V) : jmp(1, V) {
+		for (int pw = 1, k = 1; pw * 2 <= sz(V); pw *= 2, ++k) {
+			jmp.emplace_back(sz(V) - pw * 2 + 1);
+			rep(j,0,sz(jmp[k]))
+				jmp[k][j] = min(jmp[k - 1][j], jmp[k - 1][j + pw]);
+		}
+	}
+	T query(int a, int b) {
+		assert(a < b); // or return inf if a == b
+		int dep = 31 - __builtin_clz(b - a);
+		return min(jmp[dep][a], jmp[dep][b - (1 << dep)]);
+	}
+};
+\end{lstlisting}
 \subsection{Lazy Segment Tree}
 \begin{lstlisting}
 const long long inf = 1e18+5;
@@ -126,6 +184,29 @@ template<class I, class T> struct LazySeg {
     void rangeApply(int l, int r, T v){ rng(1,0,n,l,r,v); }
 };
 
+\end{lstlisting}
+\subsection{Segtree}
+\begin{lstlisting}
+#pragma once
+struct Tree {
+	typedef int T;
+	static constexpr T unit = INT_MIN;
+	T f(T a, T b) { return max(a, b); } // (any associative fn)
+	vector<T> s; int n;
+	Tree(int n = 0, T def = unit) : s(2*n, def), n(n) {}
+	void update(int pos, T val) {
+		for (s[pos += n] = val; pos /= 2;)
+			s[pos] = f(s[pos * 2], s[pos * 2 + 1]);
+	}
+	T query(int b, int e) { // query [b, e)
+		T ra = unit, rb = unit;
+		for (b += n, e += n; b < e; b /= 2, e /= 2) {
+			if (b % 2) ra = f(ra, s[b++]);
+			if (e % 2) rb = f(s[--e], rb);
+		}
+		return f(ra, rb);
+	}
+};
 \end{lstlisting}
 
 \subsection{2-D Fenwick}
@@ -324,6 +405,30 @@ struct HopcroftKarp {
         return ans;
     }
 };
+\end{lstlisting}
+
+\subsection{Vertex Cover}
+\begin{lstlisting}
+vi cover(vector<vi>& g, int n, int m) {
+	vi match(m, -1);
+	int res = dfsMatching(g, match); // hopcrafkt
+	vector<bool> lfound(n, true), seen(m);
+	for (int it : match) if (it != -1) lfound[it] = false;
+	vi q, cover;
+	rep(i,0,n) if (lfound[i]) q.push_back(i);
+	while (!q.empty()) {
+		int i = q.back(); q.pop_back();
+		lfound[i] = 1;
+		for (int e : g[i]) if (!seen[e] && match[e] != -1) {
+			seen[e] = true;
+			q.push_back(match[e]);
+		}
+	}
+	rep(i,0,n) if (!lfound[i]) cover.push_back(i);
+	rep(i,0,m) if (seen[i]) cover.push_back(n+i);
+	assert(sz(cover) == res);
+	return cover;
+}
 \end{lstlisting}
 
 \subsection{Dinic}
@@ -674,6 +779,18 @@ struct Bridges {
 };
 \end{lstlisting}
 
+\subsection{TopiSort}
+\begin{lstlisting}
+vi topoSort(const vector<vi>& gr) {
+	vi indeg(sz(gr)), q;
+	for (auto& li : gr) for (int x : li) indeg[x]++;
+	rep(i,0,sz(gr)) if (indeg[i] == 0) q.push_back(i);
+	rep(j,0,sz(q)) for (int x : gr[q[j]])
+		if (--indeg[x] == 0) q.push_back(x);
+	return q;
+}
+\end{lstlisting}
+
 \section{Number Theory}
 \subsection{Factors and Prime Factors}
 \begin{lstlisting}
@@ -734,25 +851,26 @@ template <int N, int M> struct Comb {
 
 \subsection{Sieve}
 \begin{lstlisting}
-const int LIM = 1e8; bitset<LIM> isPrime;
-vector<int> eratosthenes() {
-    const int S = sqrt(LIM), R = LIM / 2;
-    vector<int> pr = {2}, sieve(S + 1); 
-    pr.reserve(int(LIM / log(LIM) * 1.1));
-    vector<pair<int, int>> cp;
-    for (int i = 3; i <= S; i += 2) if (!sieve[i]) {
-        cp.push_back({i, i * i / 2});
-        for (int j = i * i; j <= S; j += 2 * i) sieve[j] = 1;
-    }
-    for (int L = 1; L <= R; L += S) {
-        vector<bool> block(S);
-        for (auto& [p, idx] : cp)
-            for (int i = idx; i < S + L; idx = (i += p)) block[i - L] = 1;
-        for (int i = 0; i < min(S, R - L); i++)
-            if (!block[i]) pr.push_back((L + i) * 2 + 1);
-    }
-    for (int i : pr) isPrime[i] = 1;
-    return pr;
+#pragma once
+const int LIM = 1e8;
+bitset<LIM> isPrime;
+vi eratosthenes() {
+	const int S = (int)round(sqrt(LIM)), R = LIM / 2;
+	vi pr = {2}, sieve(S+1); pr.reserve(int(LIM/log(LIM)*1.1));
+	vector<pii> cp;
+	for (int i = 3; i <= S; i += 2) if (!sieve[i]) {
+		cp.push_back({i, i * i / 2});
+		for (int j = i * i; j <= S; j += 2 * i) sieve[j] = 1;
+	}
+	for (int L = 1; L <= R; L += S) {
+		array<bool, S> block{};
+		for (auto &[p, idx] : cp)
+			for (int i=idx; i < S+L; idx = (i+=p)) block[i-L] = 1;
+		rep(i,0,min(S, R - L))
+			if (!block[i]) pr.push_back((L + i) * 2 + 1);
+	}
+	for (int i : pr) isPrime[i] = 1;
+	return pr;
 }
 \end{lstlisting}
 
