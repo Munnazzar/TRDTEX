@@ -1,0 +1,1311 @@
+\documentclass[10pt, landscape, a4paper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{multicol}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tocloft}
+\usepackage{titlesec}
+\usepackage{amsmath}
+
+% --- Geometry ---
+% 2 Columns in Landscape is very wide, so we can afford slightly larger margins
+% to avoid printer cut-off issues.
+\geometry{
+    top=1cm,
+    bottom=1cm,
+    left=1cm,
+    right=1cm,
+    headheight=15pt,
+    includehead,
+    includefoot
+}
+
+% --- Colors ---
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+
+% --- Code Setup ---
+\lstset{
+    language=C++,
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\small,  % 'small' is readable; use 'scriptsize' if you need more space
+    breaklines=true,
+    breakatwhitespace=true,      % Only break at whitespace to keep code clean
+    commentstyle=\color{mygreen},
+    keywordstyle=\color{blue}\bfseries,
+    stringstyle=\color{mymauve},
+    numberstyle=\tiny\color{mygray},
+    numbers=none,
+    numbersep=5pt,
+    tabsize=2,
+    frame=none,
+    keepspaces=true,
+    showstringspaces=false
+}
+
+% --- Headers ---
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textbf{Team Name} -- ICPC Reference}
+\rhead{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Compact Sectioning ---
+\titlespacing*{\section}{0pt}{5pt}{3pt}
+\titlespacing*{\subsection}{0pt}{5pt}{2pt}
+
+\begin{document}
+
+% 2 Columns
+\begin{multicols*}{2}
+
+\tableofcontents
+\vspace{1em}
+\hrule
+\vspace{1em}
+
+% ==========================================
+%  CODE EXAMPLES
+% ==========================================
+
+\section{Data Structures}
+\subsection{Lazy Segment Tree}
+\begin{lstlisting}
+const long long inf = 1e18+5;
+struct Tag {
+    int x=0;
+    void apply(const Tag& t){ x+=t.x; }
+};
+struct Info {
+    int x=0;
+    Info(int v=0):x(v){}
+    void apply(const Tag& t){ x+=t.x; }
+};
+Info operator+(const Info& a, const Info& b) { return {a.x+b.x}; }
+template<class I, class T> struct LazySeg {
+    int n; vector<I> d; vector<T> lz;
+    LazySeg(int n, I v=I()){ init(vector<I>(n,v)); }
+    LazySeg(vector<I> a){ init(a); }
+    void init(vector<I> a){
+        n=a.size(); int z=4*n; d.assign(z,I()); lz.assign(z,T());
+        auto b=[&](auto s,int i,int l,int r)->void{
+            if(r-l==1){ d[i]=a[l]; return; }
+            int m=(l+r)/2; s(s,2*i,l,m); s(s,2*i+1,m,r); pull(i);
+        }; b(b,1,0,n);
+    }
+    void pull(int i){ d[i]=d[2*i]+d[2*i+1]; }
+    void apply(int i, const T& v){ d[i].apply(v); lz[i].apply(v); }
+    void push(int i){ apply(2*i,lz[i]); apply(2*i+1,lz[i]); lz[i]=T(); }
+    void upd(int i,int l,int r,int p,const I& v){
+        if(r-l==1){ d[i]=v; return; }
+        int m=(l+r)/2; push(i);
+        if(p<m) upd(2*i,l,m,p,v); else upd(2*i+1,m,r,p,v);
+        pull(i);
+    }
+    I qry(int i,int l,int r,int x,int y){
+        if(l>=y||r<=x) return I();
+        if(l>=x&&r<=y) return d[i];
+        int m=(l+r)/2; push(i);
+        return qry(2*i,l,m,x,y)+qry(2*i+1,m,r,x,y);
+    }
+    void rng(int i,int l,int r,int x,int y,const T& v){
+        if(l>=y||r<=x) return;
+        if(l>=x&&r<=y){ apply(i,v); return; }
+        int m=(l+r)/2; push(i);
+        rng(2*i,l,m,x,y,v); rng(2*i+1,m,r,x,y,v); pull(i);
+    }
+    void modify(int p, I v){ upd(1,0,n,p,v); }
+    I query(int l, int r){ return qry(1,0,n,l,r); }
+    void rangeApply(int l, int r, T v){ rng(1,0,n,l,r,v); }
+};
+
+\end{lstlisting}
+
+\subsection{2-D Fenwick}
+\begin{lstlisting}
+template <class T> struct BIT2D {
+    int n, m; vector<vector<T>> b;
+    BIT2D(int N, int M) : n(N), m(M), b(N + 1, vector<T>(M + 1)) {}
+    void add(int r, int c, T v) {
+        for (int i = r + 1; i <= n; i += i & -i)
+            for (int j = c + 1; j <= m; j += j & -j) b[i][j] += v;
+    }
+    T sum(int r, int c) {
+        T s = 0;
+        for (int i = r + 1; i; i -= i & -i)
+            for (int j = c + 1; j; j -= j & -j) s += b[i][j];
+        return s;
+    }
+    T query(int r1, int c1, int r2, int c2) {
+        return sum(r2, c2) - sum(r2, c1 - 1) - sum(r1 - 1, c2) + sum(r1 - 1, c1 - 1);
+    }
+};
+\end{lstlisting}
+
+\subsection{PBSD}
+\begin{lstlisting}
+#include <ext/pb_ds/assoc_container.hpp>
+#include <ext/pb_ds/tree_policy.hpp>
+using namespace std; using namespace __gnu_pbds;
+template<class T> using o_set = tree<T, null_type, less<T>, rb_tree_tag, tree_order_statistics_node_update>;
+template<class K, class V> using o_map = tree<K, V, less<K>, rb_tree_tag, tree_order_statistics_node_update>;
+template<class T> using o_multiset = tree<T, null_type, less_equal<T>, rb_tree_tag, tree_order_statistics_node_update>;    
+\end{lstlisting}
+
+\subsection{DSU}
+\begin{lstlisting}
+struct RollbackUF {
+	vi e; vector<pii> st;
+	RollbackUF(int n) : e(n, -1) {}
+	int size(int x) { return -e[find(x)]; }
+	int find(int x) { return e[x] < 0 ? x : find(e[x]); }
+	int time() { return sz(st); }
+	void rollback(int t) { for(int i=time();i-->t;) e[st[i].first]=st[i].second; st.resize(t); }
+	bool join(int a, int b) {
+		a = find(a), b = find(b);
+		if (a == b) return 0;
+		if (e[a] > e[b]) swap(a, b);
+		st.push_back({a, e[a]}); st.push_back({b, e[b]});
+		e[a] += e[b]; e[b] = a; return 1;
+	}
+};    
+\end{lstlisting}
+
+\subsection{MINT}
+\begin{lstlisting}
+    struct mint {
+    ll x;
+    mint() : x(0) {}
+    mint(ll x) : x((x % m + m) % m) {}
+    mint& fix() { x = (x % m + m) % m; return *this; }
+    mint operator-() const { return mint(0) - *this; }
+    mint& operator+=(const mint& a) { if ((x += a.x) >= m) x -= m; return *this; }
+    mint& operator-=(const mint& a) { if ((x += m - a.x) >= m) x -= m; return *this; }
+    mint& operator*=(const mint& a) { (x *= a.x) %= m; return *this; }
+    mint pow(ll e) const {
+        mint res(1), a(*this);
+        while (e) { if (e & 1) res *= a; a *= a; e >>= 1; }
+        return res;
+    }
+    mint inv() const { return pow(m - 2); }
+    mint& operator/=(const mint& a) { return *this *= a.inv(); }
+    mint operator/(const mint& a) const { return mint(*this) /= a; }
+    mint operator+(const mint& a) const { return mint(*this) += a; }
+    mint operator-(const mint& a) const { return mint(*this) -= a; }
+    mint operator*(const mint& a) const { return mint(*this) *= a; }
+    bool operator<(const mint& a) const { return x < a.x; }
+    bool operator==(const mint& a) const { return x == a.x; }
+    friend istream& operator>>(istream& i, mint& a) { i >> a.x; return i; }
+    friend ostream& operator<<(ostream& o, const mint& a) { o << a.x; return o; }
+};
+const int MAXN = 200005;
+mint fact[MAXN], inv[MAXN];
+void init() {
+    fact[0] = 1;
+    for (int i = 1; i < MAXN; i++) fact[i] = fact[i - 1] * i;
+    inv[MAXN - 1] = fact[MAXN - 1].inv();
+    for (int i = MAXN - 2; i >= 0; i--) inv[i] = inv[i + 1] * (i + 1);
+}
+mint nCr(int n, int r) {
+    if (r < 0 || r > n) return 0;
+    return fact[n] * inv[r] * inv[n - r];
+}
+mint nPr(int n, int r) {
+    if (r < 0 || r > n) return 0;
+    return fact[n] * inv[n - r];
+}
+\end{lstlisting}
+
+\subsection{MATRIX}
+\begin{lstlisting}
+struct Matrix {
+    int n; vector<vector<mint>> mat;
+    Matrix(int _n): n(_n), mat(n, vector<mint>(n)) {}
+    vector<mint>& operator[](int i) { return mat[i]; }
+    const vector<mint>& operator[](int i) const { return mat[i]; }
+    static Matrix identity(int n) { Matrix r(n); for(int i=0; i<n; i++) r[i][i]=1; return r; }
+    Matrix operator*(const Matrix& b) const {
+        Matrix r(n);
+        for(int i=0; i<n; i++) for(int k=0; k<n; k++)
+            if(mat[i][k].x) for(int j=0; j<n; j++) r[i][j] += mat[i][k] * b[k][j];
+        return r;
+    }
+    Matrix power(long long k) const {
+        Matrix r = identity(n), b = *this;
+        while(k) { if(k&1) r = r * b; b = b * b; k >>= 1; }
+        return r;
+    }
+};
+\end{lstlisting}
+
+\section{Graph Algorithms}
+
+\subsection{2-Sat}
+\begin{lstlisting}
+struct TwoSat {
+    int n; vector<vector<int>> g, gr; vector<int> ord, id; vector<bool> vis, ans;
+    TwoSat(int n):n(n), g(2*n), gr(2*n), ans(n) {}
+    void add(int u, bool f, int v, bool h) {
+        u=2*u^f; v=2*v^h;
+        g[u^1].push_back(v); gr[v].push_back(u^1);
+        g[v^1].push_back(u); gr[u].push_back(v^1);
+    }
+    void dfs1(int u) { vis[u]=1; for(int v:g[u]) if(!vis[v]) dfs1(v); ord.push_back(u); }
+    void dfs2(int u, int c) { id[u]=c; for(int v:gr[u]) if(id[v]==-1) dfs2(v,c); }
+    bool solve() {
+        vis.assign(2*n, 0); for(int i=0; i<2*n; ++i) if(!vis[i]) dfs1(i);
+        id.assign(2*n, -1); int c=0;
+        for(int i=2*n-1; i>=0; --i) if(id[ord[i]]==-1) dfs2(ord[i], c++);
+        for(int i=0; i<n; ++i) {
+            if(id[2*i] == id[2*i+1]) return 0;
+            ans[i] = id[2*i] > id[2*i+1];
+        }
+        return 1;
+    }
+};
+\end{lstlisting}
+
+\subsection{Bellman Ford}
+\begin{lstlisting}
+struct E{int u,v,w;};
+void solve(){
+    int n,m,x; cin>>n>>m; vector<E> e(m); vector<long long> d(n); vector<int> p(n,-1),c;
+    for(auto&i:e) cin>>i.u>>i.v>>i.w, --i.u, --i.v;
+    for(int i=0;i<n;++i){
+        x=-1;
+        for(auto&k:e) if(d[k.v]>d[k.u]+k.w) d[k.v]=d[k.u]+k.w, p[k.v]=k.u, x=k.v;
+    }
+    if(x==-1){ cout<<"NO\n"; return; }
+    for(int i=0;i<n;++i) x=p[x];
+    for(int v=x;;v=p[v]){ c.push_back(v); if(v==x && c.size()>1) break; }
+    reverse(c.begin(), c.end());
+    cout<<"YES\n"; for(int i:c) cout<<i+1<<' ';
+}
+\end{lstlisting}
+\subsection{Matching}
+\begin{lstlisting}
+struct HopcroftKarp {
+    int n, m; vector<int> l, r, d; vector<vector<int>> g;
+    void init(int _n, int _m) { n = _n; m = _m; g.assign(n, {}); }
+    void ae(int u, int v) { g[u].push_back(v); }
+    bool bfs() {
+        queue<int> q; d.assign(n + 1, -1);
+        for(int i = 0; i < n; i++) if(l[i] == -1) { d[i] = 0; q.push(i); }
+        bool res = 0;
+        while(!q.empty()) {
+            int u = q.front(); q.pop();
+            if(d[u] < d[n]) {
+                for(int v : g[u]) {
+                    if(r[v] == -1) res = 1, d[n] = d[u] + 1;
+                    else if(d[r[v]] == -1) d[r[v]] = d[u] + 1, q.push(r[v]);
+                }
+            }
+        }
+        return res;
+    }
+    bool dfs(int u) {
+        for(int v : g[u]) {
+            if(r[v] == -1 || (d[r[v]] == d[u] + 1 && dfs(r[v]))) {
+                r[v] = u; l[u] = v; return 1;
+            }
+        }
+        return 0;
+    }
+    int run() {
+        l.assign(n, -1); r.assign(m, -1); int ans = 0;
+        while(bfs()) for(int i = 0; i < n; i++) if(l[i] == -1 && dfs(i)) ans++;
+        return ans;
+    }
+};
+\end{lstlisting}
+
+\subsection{Dinic}
+\begin{lstlisting}
+struct Dinic {
+    struct Edge { int to, cap, flow, rev; };
+    vector<vector<Edge>> adj; vector<int> lvl, ptr; int n;
+    Dinic(int n) : n(n), adj(n), lvl(n), ptr(n) {}
+    void add(int a, int b, int c) {
+        adj[a].push_back({b, c, 0, (int)adj[b].size()});
+        adj[b].push_back({a, 0, 0, (int)adj[a].size() - 1});
+    }
+    bool bfs(int s, int t) {
+        fill(lvl.begin(), lvl.end(), -1); lvl[s] = 0;
+        queue<int> q; q.push(s);
+        while (!q.empty()) {
+            int v = q.front(); q.pop();
+            for (auto& e : adj[v])
+                if (e.cap - e.flow > 0 && lvl[e.to] == -1)
+                    lvl[e.to] = lvl[v] + 1, q.push(e.to);
+        }
+        return lvl[t] != -1;
+    }
+    int dfs(int v, int t, int pushed) {
+        if (pushed == 0 || v == t) return pushed;
+        for (int& cid = ptr[v]; cid < adj[v].size(); ++cid) {
+            auto& e = adj[v][cid];
+            if (lvl[v] + 1 != lvl[e.to] || e.cap - e.flow == 0) continue;
+            int tr = dfs(e.to, t, min(pushed, e.cap - e.flow));
+            if (tr == 0) continue;
+            e.flow += tr; adj[e.to][e.rev].flow -= tr;
+            return tr;
+        }
+        return 0;
+    }
+    int calc(int s, int t) {
+        int flow = 0;
+        while (bfs(s, t)) {
+            fill(ptr.begin(), ptr.end(), 0);
+            while (int pushed = dfs(s, t, 2e9)) flow += pushed;
+        }
+        return flow;
+    }
+    vector<pair<int,int>> getMinCut() {
+        vector<pair<int,int>> cut;
+        for(int u = 0; u < n; ++u) if(lvl[u] != -1)
+            for(auto& e : adj[u]) if(e.cap > 0 && lvl[e.to] == -1) cut.push_back({u, e.to});
+        return cut;
+    }
+};
+\end{lstlisting}
+
+\subsection{Eulerian Path}
+\begin{lstlisting}
+template<bool D> struct Euler {
+    using pii = pair<int, int>;
+    int n; vector<vector<pii>> adj; vector<int> ptr; vector<bool> used;
+    void init(int _n) { n = _n; adj.assign(n, {}); }
+    void add_edge(int u, int v) {
+        int id = used.size(); used.push_back(0);
+        adj[u].push_back({v, id});
+        if (!D) adj[v].push_back({u, id});
+    }
+    vector<pii> solve(int src = 0) {
+        ptr.assign(n, 0);
+        vector<pii> ans, s = {{src, -1}};
+        while (!s.empty()) {
+            int u = s.back().first;
+            while (ptr[u] < adj[u].size() && used[adj[u][ptr[u]].second]) ptr[u]++;
+            if (ptr[u] == adj[u].size()) {
+                ans.push_back(s.back()); s.pop_back();
+            } else {
+                auto e = adj[u][ptr[u]];
+                used[e.second] = 1; s.push_back(e);
+            }
+        }
+        if (ans.size() != used.size() + 1) return {};
+        reverse(ans.begin(), ans.end());
+        return ans;
+    }
+};
+\end{lstlisting}
+
+\subsection{Floyd Warshall}
+\begin{lstlisting}
+const long long INF = 1e18;
+void floydWarshall(vector<vector<long long>>& m) {
+    int n = m.size();
+    for(int i=0; i<n; i++) m[i][i] = min(m[i][i], 0LL);
+    for(int k=0; k<n; k++) for(int i=0; i<n; i++) for(int j=0; j<n; j++)
+        if(m[i][k] != INF && m[k][j] != INF)
+            m[i][j] = min(m[i][j], max(m[i][k] + m[k][j], -INF));
+    for(int k=0; k<n; k++) if(m[k][k] < 0) for(int i=0; i<n; i++) for(int j=0; j<n; j++)
+        if(m[i][k] != INF && m[k][j] != INF) m[i][j] = -INF;
+}    
+\end{lstlisting}
+
+\subsection{Hamiltonian Path}
+\begin{lstlisting}
+vector<int> hamiltonianPath(int n, const vector<vector<int>>& adj) {
+    int N = 1 << n;
+    vector<vector<bool>> dp(N, vector<bool>(n));
+    vector<vector<int>> par(N, vector<int>(n, -1));
+    for(int i=0; i<n; ++i) dp[1<<i][i] = 1;
+    for(int mask=0; mask<N; ++mask) for(int u=0; u<n; ++u) if(dp[mask][u])
+        for(int v : adj[u]) if(!(mask & (1<<v)) && !dp[mask|(1<<v)][v])
+            dp[mask|(1<<v)][v] = 1, par[mask|(1<<v)][v] = u;
+    int end = -1, full = N - 1;
+    for(int i=0; i<n; ++i) if(dp[full][i]) { end = i; break; }
+    if(end == -1) return {};
+    vector<int> path;
+    for(int cur=end, mask=full; cur!=-1;) {
+        path.push_back(cur);
+        int p = par[mask][cur]; mask ^= (1<<cur); cur = p;
+    }
+    reverse(path.begin(), path.end());
+    return path;
+}
+\end{lstlisting}
+
+\subsection{Chromatic Number}
+\begin{lstlisting}
+vector<int> g[20];
+//O(n*2^n)
+int chromatic_number(int n) {
+  const int N = 1 << n;
+  vector<int> adj(n);
+  for (int u = 0; u < n; ++u)
+    for (int v : g[u])
+      adj[u] |= (1 << v);
+
+  int ans = n;
+  for (int d : {7}) { //,11,21,33,87,93}) {
+    long long mod = 1e9 + d;
+    vector<long long> ind(N), aux(N, 1);
+    ind[0] = 1;
+    for (int S = 1; S < N; ++S) {
+      int u = __builtin_ctz(S);
+      ind[S] = ind[S ^ (1 << u)] + ind[(S ^ (1 << u)) & ~adj[u]];
+    }
+    for (int k = 1; k < ans; ++k) {
+      long long w = 0;
+      for (int i = 0; i < N; ++i) {
+        int S = i ^ (i >> 1); // gray-code
+        aux[S] = (aux[S] * ind[S]) % mod;
+        w += (i & 1) ? aux[S] : -aux[S];
+      }
+      if (w % mod) ans = min(ans, k);
+    }
+  }
+  return ans;
+}
+\end{lstlisting}
+
+\subsection{Heavy-Light Decomposition}
+% Notice how this long line fits easily in Landscape 2-Column
+\begin{lstlisting}
+// Edges false means values are on nodes, true means on edges
+template <bool EDGES> struct HLD {
+    int N, ti; vector<int> par, root, depth, sz, pos;
+    vector<vector<int>> adj; LazySeg<Info, Tag> tree;
+    HLD(int _N) : N(_N), ti(0), par(_N), root(_N), depth(_N), sz(_N), pos(_N), adj(_N), tree(0) {}
+    void ae(int u, int v) { adj[u].push_back(v); adj[v].push_back(u); }
+    void build(int R = 0) {
+        par[R] = depth[R] = 0; ti = 0;
+        dfsSz(R); root[R] = R; dfsHld(R);
+        tree.init(vector<Info>(N, Info(0)));
+    }
+    void dfsSz(int x) {
+        sz[x] = 1;
+        for (int& y : adj[x]) {
+            par[y] = x; depth[y] = depth[x] + 1;
+            adj[y].erase(find(adj[y].begin(), adj[y].end(), x));
+            dfsSz(y); sz[x] += sz[y];
+            if (sz[y] > sz[adj[x][0]]) swap(y, adj[x][0]);
+        }
+    }
+    void dfsHld(int x) {
+        pos[x] = ti++;
+        for (int y : adj[x]) {
+            root[y] = (y == adj[x][0] ? root[x] : y);
+            dfsHld(y);
+        }
+    }
+    template <class F> void processPath(int u, int v, F op) {
+        while (root[u] != root[v]) {
+            if (depth[root[u]] < depth[root[v]]) swap(u, v);
+            op(pos[root[u]], pos[u]);
+            u = par[root[u]];
+        }
+        if (depth[u] > depth[v]) swap(u, v);
+        op(pos[u] + EDGES, pos[v]);
+    }
+    void modifyPath(int u, int v, int val) {
+        processPath(u, v, [&](int l, int r) { tree.rangeApply(l, r + 1, {val}); });
+    }
+    int queryPath(int u, int v) {
+        Info res;
+        processPath(u, v, [&](int l, int r) { res = res + tree.query(l, r + 1); });
+        return res.x;
+    }
+    void modifySubtree(int x, int val) {
+        tree.rangeApply(pos[x] + EDGES, pos[x] + sz[x], {val});
+    }
+    int querySubtree(int x) {
+        return tree.query(pos[x] + EDGES, pos[x] + sz[x]).x;
+    }
+};
+\end{lstlisting}
+
+\subsection{LCA}
+\begin{lstlisting}
+struct LCA {
+    int n, L = 20;
+    vector<vector<int>> g, P; vector<int> d, sz;
+    LCA(const vector<vector<int>>& adj) : n(adj.size()), g(adj), P(n, vector<int>(L+1)), d(n), sz(n) {}
+    void dfs(int u, int p = 0) {
+        P[u][0] = p; d[u] = d[p] + 1; sz[u] = 1;
+        for (int i = 1; i <= L; i++) P[u][i] = P[P[u][i - 1]][i - 1];
+        for (int v : g[u]) if (v != p) dfs(v, u), sz[u] += sz[v];
+    }
+    int lca(int u, int v) {
+        if (d[u] < d[v]) swap(u, v);
+        for (int i = L; i >= 0; i--) if (d[P[u][i]] >= d[v]) u = P[u][i];
+        if (u == v) return u;
+        for (int i = L; i >= 0; i--) if (P[u][i] != P[v][i]) u = P[u][i], v = P[v][i];
+        return P[u][0];
+    }
+    int kth(int u, int k) {
+        for (int i = 0; i <= L; i++) if (k >> i & 1) u = P[u][i];
+        return u;
+    }
+    int dist(int u, int v) { return d[u] + d[v] - 2 * d[lca(u, v)]; }
+    int go(int u, int v, int k) {
+        int l = lca(u, v), D = d[u] + d[v] - 2 * d[l];
+        return (k <= d[u] - d[l]) ? kth(u, k) : kth(v, D - k);
+    }
+};
+\end{lstlisting}
+\subsection{MaxFlowMinCut}
+\begin{lstlisting}
+    struct MCMF {
+    struct Edge { int to, rev, flow, cap, cost; };
+    vector<vector<Edge>> adj; vector<int> d, pe, pn; int n;
+    MCMF(int n) : n(n), adj(n) {}
+    void add(int u, int v, int cap, int cost) {
+        adj[u].push_back({v, (int)adj[v].size(), 0, cap, cost});
+        adj[v].push_back({u, (int)adj[u].size() - 1, 0, 0, -cost});
+    }
+    bool spfa(int s, int t, int& f, int& c) {
+        d.assign(n, 1e9); pn.assign(n, -1); pe.assign(n, -1);
+        vector<bool> in(n); queue<int> q;
+        d[s] = 0; q.push(s); in[s] = 1;
+        while (!q.empty()) {
+            int u = q.front(); q.pop(); in[u] = 0;
+            for (int i = 0; i < adj[u].size(); ++i) {
+                auto& e = adj[u][i];
+                if (e.cap - e.flow > 0 && d[e.to] > d[u] + e.cost) {
+                    d[e.to] = d[u] + e.cost; pn[e.to] = u; pe[e.to] = i;
+                    if (!in[e.to]) q.push(e.to), in[e.to] = 1;
+                }
+            }
+        }
+        if (d[t] == 1e9) return 0;
+        int push = 1e9, cur = t;
+        while (cur != s) {
+            int u = pn[cur], i = pe[cur];
+            push = min(push, adj[u][i].cap - adj[u][i].flow); cur = u;
+        }
+        f += push; c += push * d[t]; cur = t;
+        while (cur != s) {
+            int u = pn[cur], i = pe[cur];
+            adj[u][i].flow += push;
+            adj[cur][adj[u][i].rev].flow -= push; cur = u;
+        }
+        return 1;
+    }
+    pair<int, int> solve(int s, int t) {
+        int f = 0, c = 0;
+        while (spfa(s, t, f, c));
+        return {f, c};
+    }
+};
+\end{lstlisting}
+
+\subsection{SCC}
+\begin{lstlisting}
+struct Kosaraju {
+    int n, K; vector<vector<int>> adj, rev, sccs, dag;
+    vector<int> order, comp; vector<bool> vis;
+    void init(int _n) {
+        n = _n; K = 0;
+        adj.assign(n, {}); rev.assign(n, {}); sccs.clear(); dag.clear();
+    }
+    void add(int u, int v) { adj[u].push_back(v); rev[v].push_back(u); }
+    void dfs1(int u) {
+        vis[u] = true;
+        for (int v : adj[u]) if (!vis[v]) dfs1(v);
+        order.push_back(u);
+    }
+    void dfs2(int u, int c) {
+        comp[u] = c; sccs.back().push_back(u);
+        for (int v : rev[u]) if (comp[v] == -1) dfs2(v, c);
+    }
+    void run() {
+        vis.assign(n, 0); order.clear();
+        for (int i = 0; i < n; ++i) if (!vis[i]) dfs1(i);
+        reverse(order.begin(), order.end());
+        comp.assign(n, -1);
+        for (int u : order) if (comp[u] == -1) { sccs.push_back({}); dfs2(u, K++); }
+        dag.assign(K, {});
+        for (int u = 0; u < n; ++u)
+            for (int v : adj[u])
+                if (comp[u] != comp[v]) dag[comp[u]].push_back(comp[v]);
+        for (auto& v : dag) {
+            sort(v.begin(), v.end());
+            v.erase(unique(v.begin(), v.end()), v.end());
+        }
+    }
+};
+\end{lstlisting}
+
+\subsection{Bridges}
+\begin{lstlisting}
+struct Bridges {
+    int n, t = 0; vector<vector<int>> adj;
+    vector<int> tin, low; vector<bool> cut; vector<pair<int, int>> br;
+    Bridges(const vector<vector<int>>& g) : n(g.size()), adj(g), tin(n, -1), low(n), cut(n) {
+        for (int i = 0; i < n; ++i) if (tin[i] == -1) dfs(i);
+    }
+    void dfs(int u, int p = -1) {
+        tin[u] = low[u] = ++t;
+        int ch = 0; bool s = 0;
+        for (int v : adj[u]) {
+            if (v == p && !s) { s = 1; continue; }
+            if (tin[v] != -1) {
+                low[u] = min(low[u], tin[v]);
+            } else {
+                dfs(v, u);
+                low[u] = min(low[u], low[v]);
+                if (low[v] > tin[u]) br.push_back({min(u, v), max(u, v)});
+                if (p != -1 && low[v] >= tin[u]) cut[u] = 1;
+                ch++;
+            }
+        }
+        if (p == -1 && ch > 1) cut[u] = 1;
+    }
+};
+\end{lstlisting}
+
+\section{Number Theory}
+\subsection{Factors and Prime Factors}
+\begin{lstlisting}
+vector<long long> getDivs(long long n) {
+    vector<long long> d;
+    for (long long i = 1; i * i <= n; ++i)
+        if (n % i == 0) {
+            d.push_back(i);
+            if (i * i != n) d.push_back(n / i);
+        }
+    sort(d.begin(), d.end());
+    return d;
+}
+vector<long long> getPF(long long n) {
+    vector<long long> f;
+    for (long long i = 2; i * i <= n; i += 1 + (i % 2))
+        while (n % i == 0) f.push_back(i), n /= i;
+    if (n > 1) f.push_back(n);
+    return f;
+}
+\end{lstlisting}
+
+\subsection{CRT}
+\begin{lstlisting}
+    // Returns {x, lcm} such that x = a (mod m) and x = b (mod n)
+pair<ll, ll> crt(ll a, ll m, ll b, ll n) {
+    if (n > m) swap(a, b), swap(m, n);
+    ll x, y, g = gcd(m, n, x, y);
+    if ((a - b) % g != 0) return {-1, -1};
+    x = (b - a) % n * x % n / g * m + a;
+    ll lcm = m * n / g;
+    return {x < 0 ? x + lcm : x, lcm};
+}
+\end{lstlisting}
+
+\subsection{Combinatorics}
+\begin{lstlisting}
+// Usage : Comb<MAXN, MOD> C; C(n, k);
+template <int N, int M> struct Comb {
+    vector<int> f, g;
+    Comb() : f(N + 1), g(N + 1) {
+        f[0] = 1;
+        for (int i = 1; i <= N; ++i) f[i] = 1LL * f[i - 1] * i % M;
+        g[N] = pow(f[N], M - 2);
+        for (int i = N; i > 0; --i) g[i - 1] = 1LL * g[i] * i % M;
+    }
+    static int pow(int a, int b) {
+        int res = 1;
+        for (; b; b >>= 1, a = 1LL * a * a % M) if (b & 1) res = 1LL * res * a % M;
+        return res;
+    }
+    int operator()(int n, int k) const {
+        if (k < 0 || k > n) return 0;
+        return 1LL * f[n] * g[k] % M * g[n - k] % M;
+    }
+};
+\end{lstlisting}
+
+\subsection{Sieve}
+\begin{lstlisting}
+const int LIM = 1e8; bitset<LIM> isPrime;
+vector<int> eratosthenes() {
+    const int S = sqrt(LIM), R = LIM / 2;
+    vector<int> pr = {2}, sieve(S + 1); 
+    pr.reserve(int(LIM / log(LIM) * 1.1));
+    vector<pair<int, int>> cp;
+    for (int i = 3; i <= S; i += 2) if (!sieve[i]) {
+        cp.push_back({i, i * i / 2});
+        for (int j = i * i; j <= S; j += 2 * i) sieve[j] = 1;
+    }
+    for (int L = 1; L <= R; L += S) {
+        vector<bool> block(S);
+        for (auto& [p, idx] : cp)
+            for (int i = idx; i < S + L; idx = (i += p)) block[i - L] = 1;
+        for (int i = 0; i < min(S, R - L); i++)
+            if (!block[i]) pr.push_back((L + i) * 2 + 1);
+    }
+    for (int i : pr) isPrime[i] = 1;
+    return pr;
+}
+\end{lstlisting}
+
+\subsection{FFT}
+\begin{lstlisting}
+const double P = acos(-1);
+struct C {
+    double x, y;
+    C(double a = 0, double b = 0) : x(a), y(b) {}
+    C operator+(const C& c) const { return C(x + c.x, y + c.y); }
+    C operator-(const C& c) const { return C(x - c.x, y - c.y); }
+    C operator*(const C& c) const { return C(x * c.x - y * c.y, x * c.y + y * c.x); }
+};
+void fft(vector<C>& a, bool i) {
+    int n = a.size(), j = 0;
+    for (int k = 1; k < n - 1; ++k) {
+        for (int l = n >> 1; l > (j ^= l); l >>= 1);
+        if (k < j) swap(a[j], a[k]);
+    }
+    for (int l = 1, m; (m = l << 1) <= n; l <<= 1) {
+        C w(1, 0), wn(cos(P / l), (i ? 1 : -1) * sin(P / l));
+        for (int k = 0; k < n; k += m, w = C(1, 0))
+            for (int p = k; p < k + l; ++p, w = w * wn) {
+                C t = w * a[p + l];
+                a[p + l] = a[p] - t; a[p] = a[p] + t;
+            }
+    }
+    if (i) for (auto& x : a) x.x /= n, x.y /= n;
+}
+vector<int> mul(vector<int>& a, vector<int>& b) {
+    int s = 1, n = a.size(), m = b.size();
+    while (s < n + m - 1) s <<= 1;
+    vector<C> x(s), y(s);
+    for (int i = 0; i < s; ++i) x[i] = i < n ? C(a[i]) : C(), y[i] = i < m ? C(b[i]) : C();
+    fft(x, 0); fft(y, 0);
+    for (int i = 0; i < s; ++i) x[i] = x[i] * y[i];
+    fft(x, 1);
+    vector<int> r(s);
+    for (int i = 0; i < s; ++i) r[i] = x[i].x + 0.5;
+    return r;
+}
+vector<int> match(string& s, string& t) {
+    int n = s.size(), m = t.size();
+    vector<int> s1(n), s2(n), s3(n), t1(m), t2(m), t3(m), r(n), o;
+    for (int i = 0; i < n; i++) s1[i] = s[i] == '?' ? 0 : s[i] - 'a' + 1, s2[i] = s1[i] * s1[i], s3[i] = s1[i] * s2[i];
+    for (int i = 0; i < m; i++) t1[i] = t[i] == '?' ? 0 : t[i] - 'a' + 1, t2[i] = t1[i] * t1[i], t3[i] = t1[i] * t2[i];
+    reverse(t1.begin(), t1.end()); reverse(t2.begin(), t2.end()); reverse(t3.begin(), t3.end());
+    vector<int> a = mul(s1, t3), b = mul(s2, t2), c = mul(s3, t1);
+    for (int i = m - 1; i < n; i++) if (a[i] - 2 * b[i] + c[i] == 0) o.push_back(i - m + 1);
+    return o;
+}
+\end{lstlisting}
+
+
+\section{Strings}
+\subsection{Hashing}
+\begin{lstlisting}
+using ull = unsigned long long;
+int gen_base(int l = 256, int h = 1e9) {
+    static mt19937_64 r(chrono::steady_clock::now().time_since_epoch().count());
+    int b = uniform_int_distribution<int>(l + 1, h - 1)(r);
+    return max(257, b % 2 ? b : b - 1);
+}
+struct PolyHash {
+    static const int M = 1e9 + 7;
+    int b, n; vector<int> h, p; vector<ull> H, P;
+    PolyHash(const string& s, int c = 0) : b(c ? c : gen_base()), n(s.size()), h(n + 1), p(n + 1, 1), H(n + 1), P(n + 1, 1) {
+        for (int i = 0; i < n; ++i) {
+            h[i + 1] = (1LL * h[i] * b + s[i]) % M; p[i + 1] = 1LL * p[i] * b % M;
+            H[i + 1] = H[i] * b + s[i]; P[i + 1] = P[i] * b;
+        }
+    }
+    pair<int, ull> get(int l, int k) const { // [l, l+k)
+        int x = (h[l + k] - 1LL * h[l] * p[k] % M + M) % M;
+        return {x, H[l + k] - H[l] * P[k]};
+    }
+    pair<int, ull> exc(int L, int R) const { // Exclude [L, R]
+        if (L < 0) L = 0; if (R >= n) R = n - 1;
+        if (L > R) return get(0, n);
+        auto x = get(0, L), y = get(R + 1, n - R - 1);
+        int k = n - R - 1;
+        return {(1LL * x.first * p[k] % M + y.first) % M, x.second * P[k] + y.second};
+    }
+};
+\end{lstlisting}
+
+\subsection{Manacher}
+\begin{lstlisting}
+#pragma once
+// 0 is manacher even, 1 is odd
+array<vector<int>, 2> manacher(const string &s){
+    int n = s.size();
+    array<vector<int>, 2> p = {vector<int>(n + 1), vector<int>(n)};
+    for (int z = 0; z < 2; ++z)
+        for (int i = 0, l = 0, r = 0; i < n; i++){
+            int t = r - i + !z;
+            if (i < r)
+                p[z][i] = min(t, p[z][l + t]);
+            int L = i - p[z][i], R = i + p[z][i] - !z;
+            while (L >= 1 && R + 1 < n && s[L - 1] == s[R + 1])
+                p[z][i]++, L--, R++;
+            if (R > r)
+                l = L, r = R;
+        }
+    return p;
+}
+\end{lstlisting}
+
+\subsection{KMP}
+\begin{lstlisting}
+vector<int> pi(const string& s) {
+    vector<int> p(s.size());
+    for (int i = 1; i < s.size(); ++i) {
+        int g = p[i - 1];
+        while (g && s[i] != s[g]) g = p[g - 1];
+        p[i] = g + (s[i] == s[g]);
+    }
+    return p;
+}
+vector<int> match(const string& s, const string& pat) {
+    vector<int> p = pi(pat + '\0' + s), res;
+    for (int i = pat.size() + 1; i < p.size(); ++i)
+        if (p[i] == pat.size()) res.push_back(i - 2 * pat.size());
+    return res;
+}
+\end{lstlisting}
+
+\subsection{Trie}
+\begin{lstlisting}
+struct Trie {
+    struct Node {
+        Node* nxt[26] = {}; int pc = 0, end = 0;
+    } *root = new Node();
+    void insert(const string& s) {
+        Node* u = root;
+        for (char c : s) {
+            if (!u->nxt[c - 'a']) u->nxt[c - 'a'] = new Node();
+            u = u->nxt[c - 'a']; u->pc++;
+        }
+        u->end++;
+    }
+    Node* find(const string& s) {
+        Node* u = root;
+        for (char c : s) {
+            if (!u->nxt[c - 'a']) return nullptr;
+            u = u->nxt[c - 'a'];
+        }
+        return u;
+    }
+    int search(const string& s) { Node* n = find(s); return n ? n->end : 0; }
+    int prefix(const string& s) { Node* n = find(s); return n ? n->pc : 0; }
+    void erase(const string& s) {
+        if (!search(s)) return;
+        Node* u = root;
+        for (char c : s) {
+            u = u->nxt[c - 'a']; u->pc--;
+        }
+        u->end--;
+    }
+};
+\end{lstlisting}
+
+\subsection{ROPES}
+\begin{lstlisting}
+#include <ext/rope>
+using namespace __gnu_cxx;
+using rp = rope<char>;
+// insert(pos, str), erase(pos, len), substr(pos, len), at(i) -> O(log N)
+// s += t, s2 = s (persistent) -> O(1)
+
+int main() {
+    rp s; s += "Hello";
+    s.insert(5, " World"); // "Hello World"
+    rp s2 = s;             // Persistent copy
+    s.erase(0, 6);         // "World"
+    cout << s << " " << s2;
+}
+\end{lstlisting}
+
+\section{DP}
+
+\subsection{Kadane}
+\begin{lstlisting}
+tuple<int, int, int> kadane(const vector<int>& a) {
+    int cur = 0, best = -2e9, l = 0, L = 0, R = -1;
+    for (int i = 0; i < a.size(); ++i) {
+        if (cur <= 0) cur = a[i], l = i;
+        else cur += a[i];
+        if (cur > best) best = cur, L = l, R = i;
+    }
+    return {best, L, R};
+}
+\end{lstlisting}
+
+\subsection{LCS}
+\begin{lstlisting}
+int lcs(string a, string b) {
+    vector<int> dp(b.size() + 1);
+    for (char c : a) {
+        for (int i = b.size() - 1; i >= 0; i--)
+            if (b[i] == c) dp[i + 1] = dp[i] + 1;
+        for (int i = 0; i < b.size(); ++i)
+            dp[i + 1] = max(dp[i + 1], dp[i]);
+    }
+    return dp.back();
+}
+\end{lstlisting}
+
+\subsection{LIS}
+\begin{lstlisting}
+vector<int> getLIS(const vector<int>& a) {
+    if (a.empty()) return {};
+    vector<int> d, p(a.size()), ans;
+    for (int i = 0; i < a.size(); ++i) {
+        // d stores indices of tail elements. We compare a[index] vs value.
+        auto it = lower_bound(d.begin(), d.end(), a[i], 
+            [&](int idx, int val) { return a[idx] < val; });
+        int len = distance(d.begin(), it);
+        p[i] = len ? d[len - 1] : -1;
+        if (it == d.end()) d.push_back(i); else *it = i;
+    }
+    for (int cur = d.back(); cur != -1; cur = p[cur]) ans.push_back(a[cur]);
+    reverse(ans.begin(), ans.end());
+    return ans;
+}
+\end{lstlisting}
+
+\section{Geometry}
+\subsection{Point}
+\begin{lstlisting}
+using T = long double; // or long long
+const T EPS = 1e-9;
+struct Point {
+    T x, y;
+    Point operator+(Point p) const { return {x+p.x, y+p.y}; }
+    Point operator-(Point p) const { return {x-p.x, y-p.y}; }
+    Point operator*(T d) const { return {x*d, y*d}; }
+    Point operator/(T d) const { return {x/d, y/d}; }
+    T dot(Point p) const { return x*p.x + y*p.y; }
+    T cross(Point p) const { return x*p.y - y*p.x; }
+    T dist2() const { return x*x + y*y; }
+    double dist() const { return sqrt(dist2()); }
+    bool operator<(Point p) const { return make_pair(x, y) < make_pair(p.x, p.y); }
+};
+// 1 = left , -1 = right , 0 = collinear
+int ccw(Point a, Point b, Point c) {
+    T v = (b - a).cross(c - a);
+    return (v > EPS) - (v < -EPS);
+}
+// Checks if point p lies on segment ab ( inclusive )
+bool onSeg(Point p, Point a, Point b) {
+    return (a - p).dot(b - p) <= EPS && abs((a - p).cross(b - p)) < EPS;
+}
+\end{lstlisting}
+
+\subsection{Line Intersection}
+\begin{lstlisting}
+// Returns intersection of line AB and line CD
+Point lineInter(Point a, Point b, Point c, Point d) {
+    return a + (b - a) * ((c - a).cross(d - c) / (b - a).cross(d - c));
+}    
+\end{lstlisting}
+
+\subsection{Convex HUll}
+\begin{lstlisting}
+vector<Point> hull(vector<Point> p) {
+    int n = p.size(), k = 0;
+    if (n <= 2) return p;
+    sort(p.begin(), p.end());
+    vector<Point> h(2 * n);
+    for (int i = 0; i < n; ++i) {
+        while (k >= 2 && ccw(h[k - 2], h[k - 1], p[i]) <= 0) k--;
+        h[k++] = p[i];
+    }
+    for (int i = n - 2, t = k + 1; i >= 0; i--) {
+        while (k >= t && ccw(h[k - 2], h[k - 1], p[i]) <= 0) k--;
+        h[k++] = p[i];
+    }
+    h.resize(k - 1);
+    return h;
+}    
+\end{lstlisting}
+
+\section{Bitwise OPS}
+\subsection{Binary Trie}
+\begin{lstlisting}
+struct Trie {
+    struct N { int s[2] = {-1, -1}, c = 0; };
+    vector<N> t;
+    static const int B = 30;
+    Trie() { t.emplace_back(); }
+    void ins(int x, int v = 1) { // v = 1 is add, v = -1 is delete
+        int u = 0;
+        for (int i = B; i >= 0; --i) {
+            int b = x >> i & 1;
+            if (t[u].s[b] == -1) t[u].s[b] = t.size(), t.emplace_back();
+            u = t[u].s[b]; t[u].c += v;
+        }
+    }
+    int qxor(int x) { // Maximize x ^ val
+        int u = 0, res = 0;
+        for (int i = B; i >= 0; --i) {
+            int b = x >> i & 1, w = b ^ 1;
+            if (t[u].s[w] != -1 && t[t[u].s[w]].c) u = t[u].s[w], res |= 1 << i;
+            else u = t[u].s[b];
+        }
+        return res;
+    }
+    int qand(int x, int u = 0, int i = B) { // Maximize x & val
+        if (u == -1 || !t[u].c) return -1e9;
+        if (i < 0) return 0;
+        int b = x >> i & 1;
+        if (b) {
+            if (t[u].s[1] != -1 && t[t[u].s[1]].c) return (1 << i) + qand(x, t[u].s[1], i - 1);
+            return qand(x, t[u].s[0], i - 1);
+        }
+        return max(qand(x, t[u].s[0], i - 1), qand(x, t[u].s[1], i - 1));
+    }
+};
+\end{lstlisting}
+
+\subsection{Linear Basis}
+\begin{lstlisting}
+struct LinearBasis {
+    vector<int> basis;
+    void insert(int mask) {
+        for (int b : basis) mask = min(mask, mask ^ b);
+        if (mask > 0) {
+            basis.push_back(mask);
+            sort(basis.rbegin(), basis.rend());
+        }
+    }
+    bool can_form(int mask) {
+        for (int b : basis) mask = min(mask, mask ^ b);
+        return mask == 0;
+    }
+    int max_xor(int res = 0) {
+        for (int b : basis) res = max(res, res ^ b);
+        return res;
+    }
+};
+\end{lstlisting}
+
+\section{Debug}
+\subsection{DebugTempl}
+\begin{lstlisting}
+#ifndef DEBUG_TEMPLATE_CPP
+#define DEBUG_TEMPLATE_CPP
+#include <bits/stdc++.h>
+// #define cerr cout // <--- REMOVED THIS LINE so it uses actual cerr
+
+namespace __DEBUG_UTIL__
+{
+    using namespace std;
+
+    // SFINAE helpers for C++17 to detect iterables
+    template <typename T, typename = void>
+    struct is_iterable : false_type
+    {
+    };
+    template <typename T>
+    struct is_iterable<T, void_t<decltype(begin(declval<T>())), decltype(end(declval<T>()))>> : true_type
+    {
+    };
+    template <typename T>
+    constexpr bool is_iterable_v = is_iterable<T>::value;
+
+    template <typename T>
+    struct is_string : false_type
+    {
+    };
+    template <>
+    struct is_string<string> : true_type
+    {
+    };
+    template <typename T>
+    constexpr bool is_string_v = is_string<T>::value;
+
+    // Helper to detect std::pair
+    template <typename T>
+    struct is_pair : false_type
+    {
+    };
+    template <typename T, typename U>
+    struct is_pair<pair<T, U>> : true_type
+    {
+    };
+    template <typename T>
+    constexpr bool is_pair_v = is_pair<T>::value;
+
+    // SFINAE helpers for C++17 to detect .pop(), .top(), .front()
+    template <typename T, typename = void>
+    struct has_pop : false_type
+    {
+    };
+    template <typename T>
+    struct has_pop<T, void_t<decltype(declval<T>().pop())>> : true_type
+    {
+    };
+
+    template <typename T, typename = void>
+    struct has_top : false_type
+    {
+    };
+    template <typename T>
+    struct has_top<T, void_t<decltype(declval<T>().top())>> : true_type
+    {
+    };
+
+    template <typename T, typename = void>
+    struct has_front : false_type
+    {
+    };
+    template <typename T>
+    struct has_front<T, void_t<decltype(declval<T>().front())>> : true_type
+    {
+    };
+
+    // Base print functions
+    void print(const char *x) { cerr << x; }
+    void print(char x) { cerr << "\'" << x << "\'"; }
+    void print(bool x) { cerr << (x ? "T" : "F"); }
+    void print(string x) { cerr << "\"" << x << "\""; }
+    void print(vector<bool> &v)
+    {
+        int f = 0;
+        cerr << '{';
+        for (auto &&i : v)
+            cerr << (f++ ? "," : "") << (i ? "T" : "F");
+        cerr << "}";
+    }
+
+    // Generic print
+    template <typename T>
+    void print(T &&x)
+    {
+        if constexpr (is_string_v<remove_cv_t<remove_reference_t<T>>>)
+        {
+            cerr << "\"" << x << "\"";
+        }
+        else if constexpr (is_pair_v<remove_cv_t<remove_reference_t<T>>>)
+        { // Correct Pair Check
+            cerr << '(', print(x.first), cerr << ',', print(x.second), cerr << ')';
+        }
+        else if constexpr (is_iterable_v<remove_cv_t<remove_reference_t<T>>>)
+        {
+            if (size(x) == 0)
+            {
+                cerr << "{}";
+                return;
+            }
+            if constexpr (is_iterable_v<decltype(*begin(x))>)
+            { // Iterable inside Iterable
+                int f = 0;
+                cerr << "\n~~~~~\n";
+                for (auto &&i : x)
+                {
+                    cerr << setw(2) << left << f++, print(i), cerr << "\n";
+                }
+                cerr << "~~~~~\n";
+            }
+            else
+            { // Normal Iterable
+                int f = 0;
+                cerr << "{";
+                for (auto &&i : x)
+                    cerr << (f++ ? "," : ""), print(i);
+                cerr << "}";
+            }
+        }
+        else if constexpr (has_pop<remove_cv_t<remove_reference_t<T>>>::value)
+        { // Stacks/Queues
+            auto temp = x;
+            int f = 0;
+            cerr << "{";
+            if constexpr (has_top<remove_cv_t<remove_reference_t<T>>>::value)
+                while (!temp.empty())
+                {
+                    cerr << (f++ ? "," : "");
+                    print(temp.top());
+                    temp.pop();
+                }
+            else
+                while (!temp.empty())
+                {
+                    cerr << (f++ ? "," : "");
+                    print(temp.front());
+                    temp.pop();
+                }
+            cerr << "}";
+        }
+        else // Fallback for single numbers
+            cerr << x;
+    }
+
+    template <typename T, typename... V>
+    void printer(const char *names, T &&head, V &&...tail)
+    {
+        int i = 0;
+        for (size_t bracket = 0; names[i] != '\0' and (names[i] != ',' or bracket != 0); i++)
+            if (names[i] == '(' or names[i] == '<' or names[i] == '{')
+                bracket++;
+            else if (names[i] == ')' or names[i] == '>' or names[i] == '}')
+                bracket--;
+        cerr.write(names, i) << " = ";
+        print(head);
+        if constexpr (sizeof...(tail))
+            cerr << " ||", printer(names + i + 1, tail...);
+        else
+            cerr << "]\n";
+    }
+}
+
+// Ensure debug logic is enabled if ONPC is present
+#ifdef ONPC
+#define debug(...) std::cerr << __LINE__ << ": [", __DEBUG_UTIL__::printer(#__VA_ARGS__, __VA_ARGS__)
+#else
+#define debug(...)
+#endif
+#endif
+\end{lstlisting}
+
+\subsection{Template}
+\begin{lstlisting}
+#ifdef ONPC
+#define _GLIBCXX_DEBUG
+#endif
+#include <bits/stdc++.h>
+#ifdef ONPC
+#include "debug.hpp"
+#else
+#define debug(...) 42
+#endif
+using namespace std;
+
+void solve()
+{
+}
+
+int32_t main()
+{
+    ios::sync_with_stdio(0);
+    cin.tie(0);
+    int t = 1;
+    // cin >> t;
+    for (int i = 0; i < t; ++i)
+    {
+        debug(i+1);
+        solve();
+    }
+    return 0;
+}
+
+\end{lstlisting}
+\end{multicols*}
+\end{document}
